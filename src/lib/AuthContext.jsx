@@ -1,30 +1,28 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { base44 } from '@/api/base44Client'
+import { supabase } from '@/lib/supabase'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
-  const [isLoadingPublicSettings] = useState(false)
   const [authError, setAuthError] = useState(null)
 
   useEffect(() => {
-    base44.auth
-      .me()
-      .then((u) => setUser(u))
-      .catch(() => setUser(null))
-      .finally(() => setIsLoadingAuth(false))
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null)
+      setIsLoadingAuth(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => sub.subscription.unsubscribe()
   }, [])
 
   const navigateToLogin = () => {
     window.location.href = '/login'
   }
-
-  const logout = async () => {
-    await base44.auth.logout()
-    setUser(null)
-  }
+  const logout = () => supabase.auth.signOut()
 
   return (
     <AuthContext.Provider
@@ -32,7 +30,7 @@ export function AuthProvider({ children }) {
         user,
         isAuthenticated: !!user,
         isLoadingAuth,
-        isLoadingPublicSettings,
+        isLoadingPublicSettings: false,
         authError,
         setAuthError,
         navigateToLogin,
